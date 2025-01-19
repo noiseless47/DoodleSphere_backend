@@ -4,27 +4,41 @@ import { Socket } from 'socket.io-client';
 interface ChatProps {
   socket: Socket;
   roomId: string;
+  username: string;
 }
 
 interface ChatMessage {
   message: string;
   userId: string;
+  username: string;
+  timestamp: string;
 }
 
-const Chat: React.FC<ChatProps> = ({ socket, roomId }) => {
+const Chat: React.FC<ChatProps> = ({ socket, roomId, username }) => {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatStorageKey = `chat_messages_${roomId}`;
 
   useEffect(() => {
+    // Load existing messages from localStorage
+    const storedMessages = localStorage.getItem(chatStorageKey);
+    if (storedMessages) {
+      setMessages(JSON.parse(storedMessages));
+    }
+
     socket.on('chat-message', (data: ChatMessage) => {
-      setMessages(prev => [...prev, data]);
+      setMessages(prev => {
+        const newMessages = [...prev, data];
+        localStorage.setItem(chatStorageKey, JSON.stringify(newMessages));
+        return newMessages;
+      });
     });
 
     return () => {
       socket.off('chat-message');
     };
-  }, [socket]);
+  }, [socket, chatStorageKey]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -35,38 +49,66 @@ const Chat: React.FC<ChatProps> = ({ socket, roomId }) => {
     if (newMessage.trim()) {
       const messageData = {
         roomId,
-        message: newMessage
+        message: newMessage,
+        username
       };
       socket.emit('chat-message', messageData);
-      setMessages(prev => [...prev, { message: newMessage, userId: 'me' }]);
+      
+      const newMsg = {
+        message: newMessage,
+        userId: 'me',
+        username: username,
+        timestamp: new Date().toLocaleTimeString()
+      };
+      
+      setMessages(prev => {
+        const newMessages = [...prev, newMsg];
+        localStorage.setItem(chatStorageKey, JSON.stringify(newMessages));
+        return newMessages;
+      });
+      
       setNewMessage('');
     }
   };
 
   return (
-    <div className="w-80 bg-white border-l border-gray-200 flex flex-col">
+    <div className="flex flex-col h-full">
+      <div className="p-3 bg-blue-500 text-white rounded-t-lg">
+        <h3 className="font-medium">Chat</h3>
+      </div>
+      
       <div className="flex-1 p-4 overflow-y-auto">
         {messages.map((msg, idx) => (
           <div
             key={idx}
-            className={`mb-2 ${
-              msg.userId === 'me' ? 'text-right' : 'text-left'
+            className={`mb-3 ${
+              msg.userId === 'me' ? 'flex flex-col items-end' : 'flex flex-col items-start'
             }`}
           >
-            <span className="inline-block bg-blue-100 rounded px-3 py-1">
+            <div className="text-xs text-gray-500 mb-1">
+              {msg.username} • {msg.timestamp}
+            </div>
+            <div
+              className={`rounded-lg px-3 py-2 max-w-[80%] ${
+                msg.userId === 'me'
+                  ? 'bg-blue-500 text-white'
+                  : 'bg-gray-100 text-gray-800'
+              }`}
+            >
               {msg.message}
-            </span>
+            </div>
           </div>
         ))}
         <div ref={messagesEndRef} />
       </div>
-      <form onSubmit={sendMessage} className="p-4 border-t border-gray-200">
+
+      <form onSubmit={sendMessage} className="p-3 border-t">
         <input
           type="text"
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Type a message..."
-          className="w-full border rounded px-2 py-1"
+          className="w-full border rounded-full px-4 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
         />
       </form>
     </div>

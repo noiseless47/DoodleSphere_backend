@@ -1,4 +1,3 @@
-// server/server.js
 const express = require('express');
 const http = require('http');
 const cors = require('cors');
@@ -10,7 +9,7 @@ app.use(cors());
 const server = http.createServer(app);
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:5173", // Vite uses port 5173 by default
+    origin: "http://localhost:5173",
     methods: ["GET", "POST"]
   }
 });
@@ -25,9 +24,15 @@ io.on('connection', (socket) => {
   socket.on('join-room', (roomId) => {
     socket.join(roomId);
     if (!rooms.has(roomId)) {
-      rooms.set(roomId, { users: new Set(), drawings: [] });
+      rooms.set(roomId, { 
+        users: new Map(),
+        drawings: []
+      });
     }
-    rooms.get(roomId).users.add(socket.id);
+    rooms.get(roomId).users.set(socket.id, { 
+      id: socket.id,
+      username: socket.username
+    });
     
     // Send existing drawings to new user
     socket.emit('initial-state', rooms.get(roomId).drawings);
@@ -44,9 +49,12 @@ io.on('connection', (socket) => {
 
   // Handle chat messages
   socket.on('chat-message', (data) => {
+    const timestamp = new Date().toLocaleTimeString();
     socket.to(data.roomId).emit('chat-message', {
       message: data.message,
-      userId: socket.id
+      userId: socket.id,
+      username: data.username,
+      timestamp
     });
   });
 
