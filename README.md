@@ -14,7 +14,7 @@ A real-time, collaborative whiteboard app built with Vite, TSX, and TypeScript. 
 
 - **Frontend**: Vite, React, TypeScript, TSX
 - **Real-time Communication**: WebSocket (or any real-time solution like Firebase or Socket.io)
-- **State Management**: React's Context API or Zustand
+- **State Management**: React's Context API
 - **Styling**: Tailwind CSS (or any CSS framework of your choice)
 
 ## Installation
