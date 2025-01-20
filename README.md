@@ -1,4 +1,4 @@
-# Collaborative Whiteboard
+# SketchSphere
 
 A real-time, collaborative whiteboard app built with Vite, TSX, and TypeScript. This project allows multiple users to draw, share ideas, and collaborate on a virtual whiteboard in real-time.
 
