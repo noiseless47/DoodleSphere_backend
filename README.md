@@ -1,4 +1,4 @@
-# SketchSphere
+# DoodleSphere
 
 A real-time, collaborative whiteboard app built with Vite, TSX, and TypeScript. This project allows multiple users to draw, share ideas, and collaborate on a virtual whiteboard in real-time.
 
@@ -29,5 +29,5 @@ A real-time, collaborative whiteboard app built with Vite, TSX, and TypeScript. 
 1. Clone the repository:
 
    ```bash
-   git clone https://github.com/noiseless47/wb-collab.git
-   cd wb-collab
+   git clone https://github.com/noiseless47/doodlesphere.git
+   cd doodlesphere
