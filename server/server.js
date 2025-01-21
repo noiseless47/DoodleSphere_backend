@@ -23,39 +23,60 @@ io.on('connection', (socket) => {
   // Handle joining a room
   socket.on('join-room', (roomId) => {
     socket.join(roomId);
+    
+    // Initialize room if it doesn't exist
     if (!rooms.has(roomId)) {
       rooms.set(roomId, { 
         users: new Map(),
-        drawings: []
+        drawings: [],
+        history: []
       });
     }
-    rooms.get(roomId).users.set(socket.id, { 
+    
+    const room = rooms.get(roomId);
+    room.users.set(socket.id, { 
       id: socket.id,
       username: socket.username
     });
     
     // Send existing drawings to new user
-    socket.emit('initial-state', rooms.get(roomId).drawings);
+      socket.emit('initial-state', room.drawings);
   });
 
   // Handle drawing events
   socket.on('draw', (data) => {
     const room = rooms.get(data.roomId);
     if (room) {
+      // Store the drawing data
       room.drawings.push(data);
-      socket.to(data.roomId).emit('draw', data);
+      room.history.push({ type: 'draw', data });
+      socket.broadcast.to(data.roomId).emit('draw', data);
+      // Send back to sender to trigger local drawing
+      socket.emit('draw', data);
+    }
+  });
+
+  // Handle clear board event
+  socket.on('clear-board', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (room) {
+      room.drawings = [];
+      room.history = [{ type: 'clear' }];
+      io.to(roomId).emit('clear-board');  // Changed to io.to to include all clients
     }
   });
 
   // Handle chat messages
   socket.on('chat-message', (data) => {
     const timestamp = new Date().toLocaleTimeString();
-    socket.to(data.roomId).emit('chat-message', {
+    const messageData = {
       message: data.message,
       userId: socket.id,
       username: data.username,
       timestamp
-    });
+    };
+    // Broadcast to all clients in the room
+    io.to(data.roomId).emit('chat-message', messageData);
   });
 
   // Handle disconnection
@@ -66,6 +87,9 @@ io.on('connection', (socket) => {
         room.users.delete(socket.id);
         if (room.users.size === 0) {
           rooms.delete(roomId);
+        } else {
+          // Notify others that user has left
+          socket.to(roomId).emit('user-left', socket.id);
         }
       }
     });
