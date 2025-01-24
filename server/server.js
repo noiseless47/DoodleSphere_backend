@@ -2,12 +2,12 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
-require('dotenv').config();  // To load environment variables
+require('dotenv').config();
 
 const app = express();
 
-// CORS configuration using environment variables
-const allowedOrigin = process.env.CORS_ORIGIN || "http://localhost:5173";  // Use env variable or default to local
+// More flexible CORS configuration for Render
+const allowedOrigin = process.env.CORS_ORIGIN || "*";
 
 app.use(cors({
   origin: allowedOrigin,
@@ -28,15 +28,12 @@ const rooms = new Map();
 io.on('connection', (socket) => {
   console.log('User connected:', socket.id);
 
-  // Set a default username (can be enhanced by sending a name when joining)
   socket.username = `User-${socket.id}`;
 
-  // Handle joining a room
   socket.on('join-room', (roomId, username) => {
-    socket.username = username || socket.username;  // Use provided username if available
+    socket.username = username || socket.username;
     socket.join(roomId);
     
-    // Initialize room if it doesn't exist
     if (!rooms.has(roomId)) {
       rooms.set(roomId, { 
         users: new Map(),
@@ -52,7 +49,6 @@ io.on('connection', (socket) => {
       username: socket.username
     });
     
-    // Send existing drawings to new user
     socket.emit('initial-state', {
       drawings: room.drawings,
       history: room.history,
@@ -60,15 +56,14 @@ io.on('connection', (socket) => {
     });
   });
 
-  // Handle drawing events
+  // Rest of the socket event handlers remain the same as in the original file
+
   socket.on('draw', (data) => {
     const room = rooms.get(data.roomId);
     if (room) {
-      // Store the drawing data
       room.drawings.push(data);
       room.history.push({ type: 'draw', data });
       socket.broadcast.to(data.roomId).emit('draw', data);
-      // Send back to sender to trigger local drawing
       socket.emit('draw', data);
     }
   });
@@ -79,7 +74,6 @@ io.on('connection', (socket) => {
       const lastAction = room.history.pop();
       room.redoStack.push(lastAction);
 
-      // Rebuild drawings array from history
       room.drawings = room.history
         .filter(entry => entry.type === 'draw')
         .map(entry => entry.data);
@@ -92,7 +86,6 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Update redo handler
   socket.on('redo', ({ roomId }) => {
     const room = rooms.get(roomId);
     if (room && room.redoStack.length > 0) {
@@ -113,17 +106,15 @@ io.on('connection', (socket) => {
     }
   });
 
-  // Handle clear board event
   socket.on('clear-board', ({ roomId }) => {
     const room = rooms.get(roomId);
     if (room) {
       room.drawings = [];
       room.history = [{ type: 'clear' }];
-      io.to(roomId).emit('clear-board');  // Changed to io.to to include all clients
+      io.to(roomId).emit('clear-board');
     }
   });
 
-  // Handle chat messages
   socket.on('chat-message', (data) => {
     const timestamp = new Date().toLocaleTimeString();
     const messageData = {
@@ -132,11 +123,9 @@ io.on('connection', (socket) => {
       username: socket.username,
       timestamp
     };
-    // Broadcast to all clients in the room
     io.to(data.roomId).emit('chat-message', messageData);
   });
 
-  // Handle disconnection
   socket.on('disconnect', () => {
     console.log('User disconnected:', socket.id);
     rooms.forEach((room, roomId) => {
@@ -145,7 +134,6 @@ io.on('connection', (socket) => {
         if (room.users.size === 0) {
           rooms.delete(roomId);
         } else {
-          // Notify others that user has left
           socket.to(roomId).emit('user-left', socket.id);
         }
       }
@@ -153,8 +141,8 @@ io.on('connection', (socket) => {
   });
 });
 
-const PORT = process.env.PORT || 5000;
-server.listen(PORT, () => {
+// Use dynamic port for Render
+const PORT = process.env.PORT || 10000;
+server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server is running on port ${PORT}`);
-  console.log(`API Key used: ${process.env.API_KEY}`);  // Example of how to access an API Key
 });
