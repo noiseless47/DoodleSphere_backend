@@ -29,7 +29,8 @@ io.on('connection', (socket) => {
       rooms.set(roomId, { 
         users: new Map(),
         drawings: [],
-        history: []
+        history: [],
+        redoStack: []
       });
     }
     
@@ -40,7 +41,11 @@ io.on('connection', (socket) => {
     });
     
     // Send existing drawings to new user
-      socket.emit('initial-state', room.drawings);
+    socket.emit('initial-state', {
+      drawings: room.drawings,
+      history: room.history,
+      redoStack: room.redoStack
+    });
   });
 
   // Handle drawing events
@@ -53,6 +58,46 @@ io.on('connection', (socket) => {
       socket.broadcast.to(data.roomId).emit('draw', data);
       // Send back to sender to trigger local drawing
       socket.emit('draw', data);
+    }
+  });
+
+  socket.on('undo', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (room && room.history.length > 0) {
+      const lastAction = room.history.pop();
+      room.redoStack.push(lastAction);
+
+      // Rebuild drawings array from history
+      room.drawings = room.history
+        .filter(entry => entry.type === 'draw')
+        .map(entry => entry.data);
+
+      io.to(roomId).emit('undo', {
+        drawings: room.drawings,
+        history: room.history,
+        redoStack: room.redoStack
+      });
+    }
+  });
+
+  // Update redo handler
+  socket.on('redo', ({ roomId }) => {
+    const room = rooms.get(roomId);
+    if (room && room.redoStack.length > 0) {
+      const action = room.redoStack.pop();
+      room.history.push(action);
+
+      if (action.type === 'draw') {
+        room.drawings.push(action.data);
+      } else if (action.type === 'clear') {
+        room.drawings = [];
+      }
+
+      io.to(roomId).emit('redo', {
+        drawings: room.drawings,
+        history: room.history,
+        redoStack: room.redoStack
+      });
     }
   });
 
@@ -97,6 +142,6 @@ io.on('connection', (socket) => {
 });
 
 const PORT = process.env.PORT || 5000;
-module.exports = (req, res) => {
-  res.status(200).json({ message: "Hello from the server!" });
-};
+server.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
